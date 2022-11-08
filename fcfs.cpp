@@ -11,12 +11,19 @@ typedef unsigned long long ull;
 typedef long long ll;
 typedef long double lld;
 
-/* Global Queues */
+/* UUID Queue */
 
-queue<PCB*> job_queue;
-priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
-priority_queue<PCB*, vector<PCB*>, CompareProcess> device_queue;
 queue<unsigned int> UUID;
+
+unsigned int getUUID() {
+    if (!UUID.empty()) {
+        unsigned int uid = UUID.front();
+        UUID.pop();
+        return uid;
+    }
+
+    return rand();
+}
 
 /* DataTypes */
 
@@ -42,7 +49,7 @@ struct PCB {
     States state;
 
     PCB(string _pname, lld _arrival_time, lld _burst_time, lld _priority) {
-        pid = !UUID.empty() ? UUID.front() : rand();
+        pid = getUUID();
         pname = _pname;
         ptype = _pname[0] == 'I' ? 0 : 1;
         priority = _priority;
@@ -53,6 +60,10 @@ struct PCB {
         waiting_time = INT64_MIN;
         response_time = INT64_MIN;
         state = NEW;
+    }
+
+    ~PCB() {
+        UUID.push(pid);
     }
 };
 
@@ -68,16 +79,22 @@ struct CompareProcess {
     }
 };
 
+/* Global Queues */
+
+queue<PCB*> job_queue;
+priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
+priority_queue<PCB*, vector<PCB*>, CompareProcess> device_queue;
+
 /* Utility Functions */
 
 void context_switch();
 void schedule();
 
 int main() {
-    PCB* IdleProcess = new PCB("CIdle", 0, INT64_MAX, -1);
-    for (int i = 0; i < 500; i++) {
+    for (int i = 0; i < 2; i++) {
         UUID.push(i);
     }
+    PCB* IdleProcess = new PCB("CIdle", 0, INT64_MAX, -1);
 
     return 0;
 }
