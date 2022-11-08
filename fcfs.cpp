@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <queue>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
@@ -87,7 +88,9 @@ struct CompareProcess {
 
 /* Global Queues */
 
-queue<PCB*> job_queue;
+unordered_map<int, PCB*> process_map;
+unordered_map<int, PCB*> running_map;
+priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
 priority_queue<PCB*, vector<PCB*>, CompareProcess> device_queue;
 
 /* Utility Functions */
@@ -96,11 +99,40 @@ void context_switch();
 void schedule();
 
 int main() {
-    priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
     for (int i = 0; i < 100; i++) {
         UUID.push(i);
     }
-    PCB* IdleProcess1 = new PCB("IIdle1", 0, INT64_MAX, 0);
+    PCB* IdleProcess1 = new PCB("IIdle1", 0, INT64_MAX, -1);
 
     return 0;
+}
+
+void context_switch(PCB* currp, States st) {
+    currp->state = st;
+}
+
+void schedule() {
+    // 0 pid is for idle process
+    if (running_map.size() == 1 and running_map.find(0) == running_map.end()) {
+        return;
+    }
+    // If only idle process is present and some other process comes
+    if (ready_queue.size() >= 1 and running_map.size() == 1 and running_map.find(0) != running_map.end()) {
+        auto idlep = running_map[0];
+        running_map.erase(0);
+        ready_queue.push(idlep);
+        context_switch(idlep, READY);
+
+        auto currprocess = ready_queue.top();
+        ready_queue.pop();
+        running_map.insert({currprocess->pid, currprocess});
+        context_switch(currprocess, RUNNING);
+    }
+    // If running queue is empty, schedule any process in pq
+    else if (running_map.size() == 0) {
+        auto currprocess = ready_queue.top();
+        ready_queue.pop();
+        running_map.insert({currprocess->pid, currprocess});
+        context_switch(currprocess, RUNNING);
+    }
 }
