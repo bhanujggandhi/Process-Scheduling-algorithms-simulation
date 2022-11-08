@@ -39,7 +39,7 @@ struct PCB {
     unsigned int pid;
     string pname;
     bool ptype; /* 0->IO, 1->CPU */
-    ll priority;
+    int priority;
     lld arrival_time;
     lld burst_time;
     lld completion_time;
@@ -71,9 +71,15 @@ struct CompareProcess {
     bool operator()(PCB* const& p1, PCB* const& p2) {
         if (p1->priority == p2->priority) {
             if (p1->arrival_time == p2->arrival_time) {
-                return p1->pid < p2->pid;
+                if (p1->ptype == 0 and p2->ptype == 0) {
+                    return p1->pid > p2->pid;
+                } else if (p1->ptype == 0) {
+                    return false;
+                } else {
+                    return true;
+                }
             }
-            return p1->arrival_time < p2->arrival_time;
+            return p1->arrival_time > p2->arrival_time;
         }
         return p1->priority < p2->priority;
     }
@@ -82,7 +88,6 @@ struct CompareProcess {
 /* Global Queues */
 
 queue<PCB*> job_queue;
-priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
 priority_queue<PCB*, vector<PCB*>, CompareProcess> device_queue;
 
 /* Utility Functions */
@@ -91,10 +96,11 @@ void context_switch();
 void schedule();
 
 int main() {
-    for (int i = 0; i < 2; i++) {
+    priority_queue<PCB*, vector<PCB*>, CompareProcess> ready_queue;
+    for (int i = 0; i < 100; i++) {
         UUID.push(i);
     }
-    PCB* IdleProcess = new PCB("CIdle", 0, INT64_MAX, -1);
+    PCB* IdleProcess1 = new PCB("IIdle1", 0, INT64_MAX, 0);
 
     return 0;
 }
