@@ -164,11 +164,13 @@ lld getCurrTime() {
     lld New_Curr_Time = 0;
     int len = MLQ_BDevice_queue.size();
     int i = 0;
+    PCB *pcb = MLQ_BDevice_queue.front();
+    New_Curr_Time = (pcb->io_time + IO_start_time[pcb->pid]);
     while (i < len) {
         i++;
         PCB *pcb = MLQ_BDevice_queue.front();
         MLQ_BDevice_queue.pop();
-        if (New_Curr_Time < (pcb->io_time + IO_start_time[pcb->pid])) {
+        if (New_Curr_Time > (pcb->io_time + IO_start_time[pcb->pid])) {
             New_Curr_Time = (pcb->io_time + IO_start_time[pcb->pid]);
         }
         MLQ_BDevice_queue.push(pcb);
