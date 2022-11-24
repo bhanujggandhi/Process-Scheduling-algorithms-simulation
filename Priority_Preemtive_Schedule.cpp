@@ -15,10 +15,8 @@ typedef long double lld;
 
 queue<unsigned int> UUID;
 
-unsigned int getUUID()
-{
-    if (!UUID.empty())
-    {
+unsigned int getUUID() {
+    if (!UUID.empty()) {
         unsigned int uid = UUID.front();
         UUID.pop();
         return uid;
@@ -29,8 +27,7 @@ unsigned int getUUID()
 
 /* DataTypes */
 
-enum States
-{
+enum States {
     NEW,
     READY,
     RUNNING,
@@ -38,8 +35,7 @@ enum States
     TERMINATED
 };
 
-struct PCB
-{
+struct PCB {
     unsigned int pid;
     string pname;
     bool ptype; /* 0->IO, 1->CPU */
@@ -54,8 +50,7 @@ struct PCB
     lld response_time;
     States state;
 
-    PCB(string _pname, lld _arrival_time, lld _burst_time1, lld _io_time, lld _burst_time2, lld _priority)
-    {
+    PCB(string _pname, lld _arrival_time, lld _burst_time1, lld _io_time, lld _burst_time2, lld _priority) {
         pid = getUUID();
         pname = _pname;
         ptype = _pname[0] == 'I' ? 0 : 1;
@@ -71,30 +66,20 @@ struct PCB
         state = NEW;
     }
 
-    ~PCB()
-    {
+    ~PCB() {
         UUID.push(pid);
     }
 };
 
-struct CompareProcessPriority_P
-{
-    bool operator()(PCB *const &p1, PCB *const &p2)
-    {
-        if (p1->priority == p2->priority)
-        {
-            if (p1->arrival_time == p2->arrival_time)
-            {
-                if (p1->ptype == 0 and p2->ptype == 0)
-                {
+struct CompareProcessPriority_P {
+    bool operator()(PCB *const &p1, PCB *const &p2) {
+        if (p1->priority == p2->priority) {
+            if (p1->arrival_time == p2->arrival_time) {
+                if (p1->ptype == 0 and p2->ptype == 0) {
                     return p1->pid > p2->pid;
-                }
-                else if (p1->ptype == 0)
-                {
+                } else if (p1->ptype == 0) {
                     return false;
-                }
-                else
-                {
+                } else {
                     return true;
                 }
             }
@@ -105,61 +90,54 @@ struct CompareProcessPriority_P
 };
 
 /* Global Queues */
- vector<PCB *> processes;
+vector<PCB *> processes;
 unordered_map<int, PCB *> process_map;
 unordered_map<int, PCB *> Priority_PRunning_map;
 priority_queue<PCB *, vector<PCB *>, CompareProcessPriority_P> Priority_P_Ready_queue;
 priority_queue<PCB *, vector<PCB *>, CompareProcessPriority_P> Priority_P_Device_queue;
 
 /* Utility Functions */
-vector<PCB *> Priority_P(){
-    vector<PCB *>  Priority_PVect;
+vector<PCB *> Priority_P() {
+    vector<PCB *> Priority_PVect;
 
     return Priority_PVect;
 }
 void context_switch();
 void schedulePriority_P();
-int main()
-{
-    for (int i = 0; i < 500; i++)
-    {
+int main() {
+    for (int i = 0; i < 500; i++) {
         UUID.push(i);
     }
-    PCB *IdleProcess1 = new PCB("IIdle1", 0,0,0, INT64_MAX, -1);
+    PCB *IdleProcess1 = new PCB("IIdle1", 0, 0, 0, INT64_MAX, -1);
 
     int n;
-    cout<<"Enter the Number of process: ";
+    cout << "Enter the Number of process: ";
     cin >> n;
     string ProcessName;
     lld ArrivalTime, BurstTime1, IOTime, BurstTime2, Priority;
-    cout<<"\nInput format should be :  ProcessName  ArrivalTime  BurstTime1  IOTime  BurstTime2  Priority\n  ";
-   
-    for (int i = 0; i < n; i++)
-    {
-        cin>>ProcessName;
-        cin>>ArrivalTime>>BurstTime1>>IOTime>>BurstTime2>>Priority;
-        PCB *temp = new PCB( ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, Priority);
+    cout << "\nInput format should be :  ProcessName  ArrivalTime  BurstTime1  IOTime  BurstTime2  Priority\n  ";
+
+    for (int i = 0; i < n; i++) {
+        cin >> ProcessName;
+        cin >> ArrivalTime >> BurstTime1 >> IOTime >> BurstTime2 >> Priority;
+        PCB *temp = new PCB(ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, Priority);
         processes.push_back(temp);
     }
-   
+
     return 0;
 }
 
-void context_switch(PCB *currp, States st)
-{
+void context_switch(PCB *currp, States st) {
     currp->state = st;
 }
 
-void schedulePriority_P()
-{
+void schedulePriority_P() {
     // 0 pid is for idle process
-    if (Priority_PRunning_map.size() == 1 and Priority_PRunning_map.find(0) == Priority_PRunning_map.end())
-    {
+    if (Priority_PRunning_map.size() == 1 and Priority_PRunning_map.find(0) == Priority_PRunning_map.end()) {
         return;
     }
     // If only idle process is present and some other process comes
-    if (Priority_P_Ready_queue.size() >= 1 and Priority_PRunning_map.size() == 1 and Priority_PRunning_map.find(0) != Priority_PRunning_map.end())
-    {
+    if (Priority_P_Ready_queue.size() >= 1 and Priority_PRunning_map.size() == 1 and Priority_PRunning_map.find(0) != Priority_PRunning_map.end()) {
         auto idlep = Priority_PRunning_map[0];
         Priority_PRunning_map.erase(0);
         Priority_P_Ready_queue.push(idlep);
@@ -171,8 +149,7 @@ void schedulePriority_P()
         context_switch(currprocess, RUNNING);
     }
     // If running queue is empty, schedule any process in pq
-    else if (Priority_PRunning_map.size() == 0)
-    {
+    else if (Priority_PRunning_map.size() == 0) {
         auto currprocess = Priority_P_Ready_queue.top();
         Priority_P_Ready_queue.pop();
         Priority_PRunning_map.insert({currprocess->pid, currprocess});

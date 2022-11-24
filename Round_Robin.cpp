@@ -291,7 +291,7 @@ vector<PCB *> RR_Sched(lld time_slice) {
             }
         } else {
             if (pcb->arrival_time < Curr_Time) {
-                if (pcb->burst_time2 < time_slice) {
+                if (pcb->burst_time2 <= time_slice) {
                     Curr_Time += pcb->burst_time2;
                     pcb->burst_time2 = 0;
                     terminate(pcb, Curr_Time);
@@ -303,7 +303,7 @@ vector<PCB *> RR_Sched(lld time_slice) {
                 }
 
             } else {
-                if (pcb->burst_time2 < time_slice) {
+                if (pcb->burst_time2 <= time_slice) {
                     Curr_Time = pcb->arrival_time + pcb->burst_time2;
                     pcb->burst_time2 = 0;
                     terminate(pcb, Curr_Time);
