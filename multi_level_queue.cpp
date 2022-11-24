@@ -4,14 +4,12 @@
 #include <unordered_map>
 #include <vector>
 using namespace std;
-
 /* Type Definition */
 typedef unsigned long long ull;
 typedef long long ll;
 typedef long double lld;
 /* UUID Queue */
 queue<unsigned int> UUID;
-
 unsigned int getUUID() {
     if (!UUID.empty()) {
         unsigned int uid = UUID.front();
@@ -21,9 +19,7 @@ unsigned int getUUID() {
 
     return rand();
 }
-
 /* DataTypes */
-
 enum States {
     NEW,
     READY,
