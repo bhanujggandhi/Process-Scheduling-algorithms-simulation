@@ -2,3 +2,10 @@
 Ia 0 5 2 1  
 Ca 2 2 50 2  
 Iv 4 4 1 9  
+
+
+#git commands-----
+git status
+git commit -m="msg"
+git add .
+git push -force
