@@ -162,11 +162,13 @@ lld getCurrTime() {
     lld New_Curr_Time = 0;
     int len = Device_queue.size();
     int i = 0;
+    PCB *pcb = Device_queue.front();
+    New_Curr_Time = (pcb->io_time + IO_start_time[pcb->pid]);
     while (i < len) {
         i++;
         PCB *pcb = Device_queue.front();
         Device_queue.pop();
-        if (New_Curr_Time < (pcb->io_time + IO_start_time[pcb->pid])) {
+        if (New_Curr_Time > (pcb->io_time + IO_start_time[pcb->pid])) {
             New_Curr_Time = (pcb->io_time + IO_start_time[pcb->pid]);
         }
         Device_queue.push(pcb);

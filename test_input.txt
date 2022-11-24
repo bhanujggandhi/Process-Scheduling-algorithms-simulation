@@ -1,4 +1,11 @@
  #Multilevel_queue---------
- Ia 0 2 3 7 
-Ca 2 3 2 4 
-Iv 5 4 1 2 
+Ia 0 5 2 1  
+Ca 2 2 50 2  
+Iv 4 4 1 9  
+
+
+#git commands-----
+git status
+git commit -m="msg"
+git add .
+git push -force
