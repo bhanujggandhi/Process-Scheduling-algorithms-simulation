@@ -315,13 +315,25 @@ vector<PCB *> MLQ() {
         }
         // Process_Status[processes[i]->pid] = {false, false, false};
     }
-    while (MLQ_Background_Ready_queue.size() > 0 && Start_queue.size() > 0) {
-        Curr_Time = do_foreground_sched(Curr_Time);
-        Curr_Time = do_background_sched(Curr_Time);
+    PCB *pcb = Start_queue.front();
+    Curr_Time = pcb->arrival_time;
+    while (!Start_queue.empty()) {
+        PCB *pcb = Start_queue.front();
+        if (pcb->arrival_time > Curr_Time) break;
+        pcb->RR = Curr_Time;
+        MLQ_foreground_Ready_queue.push(pcb);
+        Start_queue.pop();
     }
+    // while (MLQ_Background_Ready_queue.size() > 0 && Start_queue.size() > 0) {
+    //     Curr_Time = do_foreground_sched(Curr_Time);
+    //     Curr_Time = do_background_sched(Curr_Time);
+    // }
+
     while (Start_queue.size() > 0) {
+        // cout << " cc";
         Curr_Time = do_foreground_sched(Curr_Time);
     }
+    // cout << "here";
     while (MLQ_Background_Ready_queue.size() > 0) {
         Curr_Time = do_background_sched(Curr_Time);
     }
@@ -330,7 +342,6 @@ vector<PCB *> MLQ() {
 }
 
 lld do_foreground_sched(lld Curr_Time) {
-    // time_slice_foreground
     while (MLQ_foreground_Ready_queue.size() > 0) {
         adjust_foreground_Device_queue(Curr_Time);
         PCB *pcb = MLQ_foreground_Ready_queue.top();
