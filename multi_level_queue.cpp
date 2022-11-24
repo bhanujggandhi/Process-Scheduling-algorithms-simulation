@@ -110,10 +110,10 @@ queue<PCB *> Background_Device_queue;
 queue<PCB *> foreground_Device_queue;
 queue<PCB *> Start_queue;
 lld Last_io_UpdationTime = 0;
-bool flag = true;
+bool flag = false;
 lld time_slice_foreground = 2;
 lld time_slice_background = 1;
-lld time_slice = 1;
+lld time_slice = 2;
 /* Utility Functions */
 void terminate(PCB *, lld);
 void adjust_Background_Device_queue(lld Curr_Time);
@@ -324,16 +324,23 @@ vector<PCB *> MLQ() {
         MLQ_foreground_Ready_queue.push(pcb);
         Start_queue.pop();
     }
-    // while (MLQ_Background_Ready_queue.size() > 0 && Start_queue.size() > 0) {
-    //     Curr_Time = do_foreground_sched(Curr_Time);
-    //     Curr_Time = do_background_sched(Curr_Time);
-    // }
+
+    pcb = MLQ_Background_Ready_queue.top();
+    lld ATFirst = pcb->arrival_time;
+    if (pcb->arrival_time != 0 && Start_queue.empty()) {
+        PCB *IdleProcess = new PCB("IIdle1", 0, pcb->arrival_time, 0, 0, -1);
+        MLQ_Background_Ready_queue.push(IdleProcess);
+    }
+
+    while (MLQ_Background_Ready_queue.size() > 0 && Start_queue.size() > 0) {
+        Curr_Time = do_foreground_sched(Curr_Time);
+        if (Curr_Time >= ATFirst)
+            Curr_Time = do_background_sched(Curr_Time);
+    }
 
     while (Start_queue.size() > 0) {
-        // cout << " cc";
         Curr_Time = do_foreground_sched(Curr_Time);
     }
-    // cout << "here";
     while (MLQ_Background_Ready_queue.size() > 0) {
         Curr_Time = do_background_sched(Curr_Time);
     }

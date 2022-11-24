@@ -1,12 +1,11 @@
  #Multilevel_queue---------
-Ia 0 5 0 0 
-Ca 2 2 0 0  
-Iv 4 4 0 0 
-Cb 5 3 0 0 
-
+Ia 0 5 2 6 1
+Ca 2 2 4 2 2 
+Iv 4 4 1 4 1
+Cb 5 3 5 1 2
 
 #git commands-----
 git status
 git add -A
-git commit -m="msg"
+git commit -m "msg"
 git push --force 
