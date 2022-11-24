@@ -4,6 +4,10 @@
 #include <unordered_map>
 #include <vector>
 using namespace std;
+
+#define TIME_SLICE_FORE 4
+#define TIME_SLICE_BACK 2
+
 /* Type Definition */
 typedef unsigned long long ull;
 typedef long long ll;
@@ -111,8 +115,8 @@ queue<PCB *> foreground_Device_queue;
 queue<PCB *> Start_queue;
 lld Last_io_UpdationTime = 0;
 bool flag = false;
-lld time_slice_foreground = 2;
-lld time_slice_background = 1;
+lld time_slice_foreground = TIME_SLICE_FORE;
+lld time_slice_background = TIME_SLICE_BACK;
 lld time_slice = 2;
 /* Utility Functions */
 void terminate(PCB *, lld);
@@ -313,32 +317,37 @@ vector<PCB *> MLQ() {
         } else {
             Start_queue.push(processes[i]);
         }
-        // Process_Status[processes[i]->pid] = {false, false, false};
     }
-    PCB *pcb = Start_queue.front();
-    Curr_Time = pcb->arrival_time;
-    while (!Start_queue.empty()) {
+    lld ATFirst = 0;
+    if (!MLQ_Background_Ready_queue.empty()) {
+        PCB *pcb = MLQ_Background_Ready_queue.top();
+        ATFirst = pcb->arrival_time;
+    }
+    if (!Start_queue.empty()) {
         PCB *pcb = Start_queue.front();
-        if (pcb->arrival_time > Curr_Time) break;
-        pcb->RR = Curr_Time;
-        MLQ_foreground_Ready_queue.push(pcb);
-        Start_queue.pop();
+        Curr_Time = pcb->arrival_time;
+        while (!Start_queue.empty()) {
+            PCB *pcb = Start_queue.front();
+            if (pcb->arrival_time > Curr_Time) break;
+            pcb->RR = Curr_Time;
+            MLQ_foreground_Ready_queue.push(pcb);
+            Start_queue.pop();
+        }
+    } else {
+        Curr_Time = ATFirst;
     }
+    // if (pcb->arrival_time != 0 && Start_queue.empty()) {
+    //     PCB *IdleProcess = new PCB("IIdle1", 0, pcb->arrival_time, 0, 0, -1);
+    //     MLQ_Background_Ready_queue.push(IdleProcess);
+    // }
 
-    pcb = MLQ_Background_Ready_queue.top();
-    lld ATFirst = pcb->arrival_time;
-    if (pcb->arrival_time != 0 && Start_queue.empty()) {
-        PCB *IdleProcess = new PCB("IIdle1", 0, pcb->arrival_time, 0, 0, -1);
-        MLQ_Background_Ready_queue.push(IdleProcess);
-    }
-
-    while (MLQ_Background_Ready_queue.size() > 0 && Start_queue.size() > 0) {
+    while (MLQ_Background_Ready_queue.size() > 0 && (Start_queue.size() > 0 || !foreground_Device_queue.empty() || !MLQ_foreground_Ready_queue.empty())) {
         Curr_Time = do_foreground_sched(Curr_Time);
         if (Curr_Time >= ATFirst)
             Curr_Time = do_background_sched(Curr_Time);
     }
 
-    while (Start_queue.size() > 0) {
+    while (Start_queue.size() > 0 || !foreground_Device_queue.empty() || !MLQ_foreground_Ready_queue.empty()) {
         Curr_Time = do_foreground_sched(Curr_Time);
     }
     while (MLQ_Background_Ready_queue.size() > 0) {
@@ -349,7 +358,8 @@ vector<PCB *> MLQ() {
 }
 
 lld do_foreground_sched(lld Curr_Time) {
-    while (MLQ_foreground_Ready_queue.size() > 0) {
+    adjust_foreground_Device_queue(Curr_Time);
+    while (MLQ_foreground_Ready_queue.size() > 0 && time_slice_foreground > 0) {
         adjust_foreground_Device_queue(Curr_Time);
         PCB *pcb = MLQ_foreground_Ready_queue.top();
         // cout << "Curr_Time : " << Curr_Time << " Pid :- " << pcb->pid << " Burst Time1- " << pcb->burst_time1 << " IO- " << pcb->io_time
@@ -362,9 +372,10 @@ lld do_foreground_sched(lld Curr_Time) {
             scheduleRR();
         }
         if (pcb->burst_time1 > 0) {
-            if (pcb->arrival_time < Curr_Time) {
+            if (pcb->arrival_time <= Curr_Time) {
                 if (pcb->burst_time1 <= time_slice) {
                     Curr_Time += pcb->burst_time1;
+                    time_slice_foreground -= pcb->burst_time1;
                     pcb->burst_time1 = 0;
                     if (pcb->io_time > 0) {
                         foreground_Device_queue.push(pcb);
@@ -379,6 +390,7 @@ lld do_foreground_sched(lld Curr_Time) {
                     }
                 } else {
                     Curr_Time += time_slice;
+                    time_slice_foreground -= time_slice;
                     pcb->burst_time1 -= time_slice;
                     pcb->RR = Curr_Time;
                     MLQ_foreground_Ready_queue.push(pcb);
@@ -386,7 +398,16 @@ lld do_foreground_sched(lld Curr_Time) {
 
             } else {
                 if (pcb->burst_time1 <= time_slice) {
+
+                    if (!MLQ_Background_Ready_queue.empty()) {
+                        MLQ_foreground_Ready_queue.push(pcb);
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
+
                     Curr_Time = pcb->arrival_time + pcb->burst_time1;
+                    time_slice_foreground -= pcb->burst_time1;
                     pcb->burst_time1 = 0;
                     if (pcb->io_time > 0) {
                         foreground_Device_queue.push(pcb);
@@ -400,20 +421,29 @@ lld do_foreground_sched(lld Curr_Time) {
                         }
                     }
                 } else {
+                    if (!MLQ_Background_Ready_queue.empty()) {
+                        MLQ_foreground_Ready_queue.push(pcb);
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time = pcb->arrival_time + time_slice;
+                    time_slice_foreground -= pcb->burst_time1;
                     pcb->burst_time1 -= time_slice;
                     pcb->RR = Curr_Time;
                     MLQ_foreground_Ready_queue.push(pcb);
                 }
             }
         } else {
-            if (pcb->arrival_time < Curr_Time) {
+            if (pcb->arrival_time <= Curr_Time) {
                 if (pcb->burst_time2 <= time_slice) {
                     Curr_Time += pcb->burst_time2;
+                    time_slice_foreground -= pcb->burst_time2;
                     pcb->burst_time2 = 0;
                     terminate(pcb, Curr_Time);
                 } else {
                     Curr_Time += time_slice;
+                    time_slice_foreground -= time_slice;
                     pcb->burst_time2 -= time_slice;
                     pcb->RR = Curr_Time;
                     MLQ_foreground_Ready_queue.push(pcb);
@@ -421,7 +451,15 @@ lld do_foreground_sched(lld Curr_Time) {
 
             } else {
                 if (pcb->burst_time2 <= time_slice) {
+
+                    if (!MLQ_Background_Ready_queue.empty()) {
+                        MLQ_foreground_Ready_queue.push(pcb);
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time = pcb->arrival_time + pcb->burst_time2;
+                    time_slice_foreground -= pcb->burst_time2;
                     pcb->burst_time2 = 0;
                     terminate(pcb, Curr_Time);
                 } else {
@@ -454,11 +492,13 @@ lld do_foreground_sched(lld Curr_Time) {
             adjust_foreground_Device_queue(Curr_Time);
         }
     }
+    time_slice_foreground = TIME_SLICE_FORE;
     return Curr_Time;
 }
 lld do_background_sched(lld Curr_Time) {
     // time_slice_background;
-    while (MLQ_Background_Ready_queue.size() > 0) {
+    adjust_Background_Device_queue(Curr_Time);
+    while (MLQ_Background_Ready_queue.size() > 0 && time_slice_background > 0) {
         adjust_Background_Device_queue(Curr_Time);
         PCB *pcb = MLQ_Background_Ready_queue.top();
         lld prev_Curr_Time = Curr_Time;
@@ -482,28 +522,77 @@ lld do_background_sched(lld Curr_Time) {
             flag = false;
         } else {
             if (pcb->burst_time1 > 0) {
-                if (pcb->arrival_time < Curr_Time) {
+                if (pcb->arrival_time <= Curr_Time) {
+                    if (pcb->burst_time1 > time_slice_background) {
+                        pcb->burst_time1 -= time_slice_background;
+                        MLQ_Background_Ready_queue.push(pcb);
+                        Curr_Time += time_slice_background;
+                        time_slice_background = 0;
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time += pcb->burst_time1;
+                    time_slice_background -= pcb->burst_time1;
+                    pcb->burst_time1 = 0;
                 } else {
+                    if (!MLQ_foreground_Ready_queue.empty()) {
+                        // time_slice_foreground = TIME_SLICE_FORE;
+                        MLQ_Background_Ready_queue.push(pcb);
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time = pcb->arrival_time + pcb->burst_time1;
+                    time_slice_background -= pcb->burst_time1;
+                    pcb->burst_time1 = 0;
                 }
-                pcb->burst_time1 = 0;
-                if (pcb->io_time > 0) {
-                    Background_Device_queue.push(pcb);
-                    IO_start_time[pcb->pid] = Curr_Time;
-                } else {
-                    Curr_Time += pcb->burst_time2;
-                    pcb->burst_time2 = 0;
-                    terminate(pcb, Curr_Time);
+                if (pcb->burst_time1 == 0) {
+                    if (pcb->io_time > 0) {
+                        Background_Device_queue.push(pcb);
+                        IO_start_time[pcb->pid] = Curr_Time;
+                    } else {
+                        if (pcb->burst_time2 > time_slice_background) {
+                            pcb->burst_time2 -= time_slice_background;
+                            MLQ_Background_Ready_queue.push(pcb);
+                            Curr_Time += time_slice_background;
+                            MLQRunning_map.erase(pcb->pid);
+                            MLQRunning_map.clear();
+                            break;
+                        }
+                        Curr_Time += pcb->burst_time2;
+                        time_slice_background -= pcb->burst_time2;
+                        pcb->burst_time2 = 0;
+                        terminate(pcb, Curr_Time);
+                    }
                 }
             } else {
-                if (pcb->arrival_time < Curr_Time) {
+                if (pcb->arrival_time <= Curr_Time) {
+                    if (pcb->burst_time2 > time_slice_background) {
+                        pcb->burst_time2 -= time_slice_background;
+                        MLQ_Background_Ready_queue.push(pcb);
+                        Curr_Time += time_slice_background;
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time += pcb->burst_time2;
+                    time_slice_background -= pcb->burst_time2;
+                    pcb->burst_time2 = 0;
                 } else {
+                    if (!MLQ_foreground_Ready_queue.empty()) {
+                        // time_slice_foreground = TIME_SLICE_FORE;
+                        MLQ_Background_Ready_queue.push(pcb);
+                        MLQRunning_map.erase(pcb->pid);
+                        MLQRunning_map.clear();
+                        break;
+                    }
                     Curr_Time = pcb->arrival_time + pcb->burst_time2;
+                    time_slice_background -= pcb->burst_time2;
+                    pcb->burst_time2 = 0;
                 }
-                pcb->burst_time2 = 0;
-                terminate(pcb, Curr_Time);
+                if (pcb->burst_time2 == 0)
+                    terminate(pcb, Curr_Time);
             }
         }
         MLQRunning_map.erase(pcb->pid);
@@ -513,5 +602,6 @@ lld do_background_sched(lld Curr_Time) {
             adjust_Background_Device_queue(Curr_Time);
         }
     }
+    time_slice_background = TIME_SLICE_BACK;
     return Curr_Time;
 }
