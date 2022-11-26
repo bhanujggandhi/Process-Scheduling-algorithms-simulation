@@ -246,6 +246,7 @@ bool schedulePriority() {
 vector<PCB *> Priority_Sched() {
     vector<PCB *> PriorityVect;
     sort(processes.begin(), processes.end(), [](auto &a, auto &b) { return a->arrival_time < b->arrival_time; });
+    sort(org_processes.begin(), org_processes.end(), [](auto &a, auto &b) { return a->arrival_time < b->arrival_time; });
     lld Curr_Time = 0;
     bool flag = true;
     for (int i = 0; i < processes.size(); i++) {

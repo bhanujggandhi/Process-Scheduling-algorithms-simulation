@@ -251,6 +251,7 @@ bool scheduleRR() {
 vector<PCB *> RR_Sched(lld time_slice) {
     vector<PCB *> RRVect;
     sort(processes.begin(), processes.end(), [](auto &a, auto &b) { return a->arrival_time < b->arrival_time; });
+    sort(org_processes.begin(), org_processes.end(), [](auto &a, auto &b) { return a->arrival_time < b->arrival_time; });
     lld Curr_Time = 0;
     bool flag = true;
     int no_of_Process = processes.size();
