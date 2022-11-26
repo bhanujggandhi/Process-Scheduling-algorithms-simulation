@@ -91,18 +91,17 @@ struct CompareProcess_Priority {
 struct cmpr_arrival {
     bool operator()(PCB *const &p1, PCB *const &p2) {
         if (p1->arrival_time == p2->arrival_time) {
-                if (p1->ptype == 0 and p2->ptype == 0) {
-                    return p1->pid > p2->pid;
-                } else if (p1->ptype == 0) {
-                    return false;
-                } else {
-                    return true;
-                }
+            if (p1->ptype == 0 and p2->ptype == 0) {
+                return p1->pid > p2->pid;
+            } else if (p1->ptype == 0) {
+                return false;
+            } else {
+                return true;
             }
-            return p1->arrival_time > p2->arrival_time;
+        }
+        return p1->arrival_time > p2->arrival_time;
     }
 };
-
 
 /* Global Queues */
 vector<PCB *> processes;
@@ -223,7 +222,7 @@ bool schedulePriority() {
     }
     return false;
 }
-bool cmptr(PCB* &a ,PCB* &b){
+bool cmptr(PCB *&a, PCB *&b) {
     return a->arrival_time < b->arrival_time;
 }
 vector<PCB *> Priority_Sched() {
@@ -231,15 +230,15 @@ vector<PCB *> Priority_Sched() {
     sort(processes.begin(), processes.end(), cmptr);
     lld Curr_Time = 0;
     queue<lld> distinct_arrival_time;
-    
+
     distinct_arrival_time.push(processes[0]->arrival_time);
     bool flag = true;
     for (int i = 0; i < processes.size(); i++) {
         Start_queue.push(processes[i]);
     }
     for (int i = 1; i < processes.size(); i++) {
-       if(distinct_arrival_time.back() != processes[i]->arrival_time)
-       distinct_arrival_time.push(processes[i]->arrival_time);
+        if (distinct_arrival_time.back() != processes[i]->arrival_time)
+            distinct_arrival_time.push(processes[i]->arrival_time);
     }
     Curr_Time = distinct_arrival_time.front();
     distinct_arrival_time.pop();
@@ -250,173 +249,127 @@ vector<PCB *> Priority_Sched() {
         Start_queue.pop();
     }
     while (Priority_Ready_queue.size() > 0) {
-        
         adjust_Device_queue(Curr_Time);
         PCB *pcb = Priority_Ready_queue.top();
-        cout<<pcb->pname<<" "<<pcb->burst_time1<<" "<<pcb->io_time<<" "<<pcb->burst_time2<< endl;
         lld prev_Curr_Time = Curr_Time;
+        if (pcb->response_time == INT64_MIN) {
+            pcb->response_time = Curr_Time;
+        }
         bool check = schedulePriority();
         if (!check && !Device_queue.empty()) {
             Curr_Time = getCurrTime();
             adjust_Device_queue(Curr_Time);
             schedulePriority();
-            cout<<"hii"<<endl;
+            cout << "hii" << endl;
         }
         if (flag) {
+            if (pcb->burst_time1 > 0) {
+                if (!distinct_arrival_time.empty() && distinct_arrival_time.front() <= Curr_Time + pcb->burst_time1) {
+                    lld temp_time = distinct_arrival_time.front();
+                    while (!Start_queue.empty()) {
+                        PCB *pc = Start_queue.top();
+                        if (pc->arrival_time > temp_time) break;
+                        Priority_Ready_queue.push(pc);
+                        Start_queue.pop();
+                    }
+                    PCB *pcb1 = Priority_Ready_queue.top();
+                    if (pcb->pid != pcb1->pid) {
+                        // cout<<pcb->pid<<" "<<pcb1->pid<<endl;
+                        pcb->burst_time1 -= pcb1->arrival_time - Curr_Time;
+                        Curr_Time += pcb1->arrival_time - Curr_Time;
+                        if (pcb->burst_time1 >= 0) {
+                            Priority_Ready_queue.push(pcb);
+                        }
+                        if (pcb->burst_time1 == 0) {
+                            if (pcb->io_time > 0) {
+                                pcb->arrival_time = Curr_Time + pcb->io_time;
+                                // Device_queue.push(pcb);
+                                IO_start_time[pcb->pid] = Curr_Time;
 
-            
-            if(pcb->burst_time1 > 0 ){
-                if( !distinct_arrival_time.empty() && distinct_arrival_time.front() <= Curr_Time + pcb->burst_time1)
-                {lld temp_time = distinct_arrival_time.front();
-                while (!Start_queue.empty()) {
-                PCB *pc = Start_queue.top();
-                if (pc->arrival_time > temp_time) break;
-                Priority_Ready_queue.push(pc);
-                Start_queue.pop();
-                
-                }
-    PCB *pcb1 = Priority_Ready_queue.top();
-            if(pcb->pid != pcb1->pid){
-                // cout<<pcb->pid<<" "<<pcb1->pid<<endl;
-                pcb->burst_time1 -= pcb1->arrival_time - Curr_Time; 
-                Curr_Time += pcb1->arrival_time - Curr_Time;
-                if(pcb->burst_time1 >= 0 ){
-                    Priority_Ready_queue.push(pcb);
-                }
-                if(pcb->burst_time1 == 0){
-                    if (pcb->io_time > 0) {
-                pcb->arrival_time = Curr_Time + pcb->io_time;
-                // Device_queue.push(pcb);
-                IO_start_time[pcb->pid] = Curr_Time;
-                
-                pcb->io_time = 0;
-                if(pcb->burst_time2 == 0){
-                    terminate(pcb,Curr_Time+pcb->io_time);
-
-                }
-                Start_queue.push(pcb);
-                vector<lld> t;
-                while(!distinct_arrival_time.empty()){
-                    t.push_back(distinct_arrival_time.front());
+                                pcb->io_time = 0;
+                                if (pcb->burst_time2 == 0) {
+                                    terminate(pcb, Curr_Time + pcb->io_time);
+                                }
+                                Start_queue.push(pcb);
+                                vector<lld> t;
+                                while (!distinct_arrival_time.empty()) {
+                                    t.push_back(distinct_arrival_time.front());
+                                    distinct_arrival_time.pop();
+                                }
+                                t.push_back(pcb->arrival_time);
+                                sort(t.begin(), t.end());
+                                for (int i = 0; i < t.size(); i++) {
+                                    distinct_arrival_time.push(t[i]);
+                                }
+                            }
+                        }
+                        continue;
+                    } else {
+                        Curr_Time = Curr_Time + pcb->burst_time1;
+                        pcb->burst_time1 = 0;
+                    }
                     distinct_arrival_time.pop();
+                } else {
+                    Curr_Time = Curr_Time + pcb->burst_time1;
+                    pcb->burst_time1 = 0;
                 }
-                t.push_back(pcb->arrival_time);
-                sort(t.begin(),t.end());
-                for(int i = 0 ; i < t.size(); i++)
-                {
-                    
-                    distinct_arrival_time.push(t[i]);
-                }
-                
             }
-                }
-                continue;
-            }
-            else
-            {Curr_Time = Curr_Time + pcb->burst_time1;
-            pcb->burst_time1 = 0;}
-            distinct_arrival_time.pop();}
-            else
-            {Curr_Time = Curr_Time + pcb->burst_time1;
-            pcb->burst_time1 = 0;}
-            
-            }
-            
-
-            
 
             if (pcb->io_time > 0) {
                 pcb->arrival_time = Curr_Time + pcb->io_time;
                 // Device_queue.push(pcb);
                 IO_start_time[pcb->pid] = Curr_Time;
-                
+
                 pcb->io_time = 0;
-                if(pcb->burst_time2 == 0){
-                    terminate(pcb,Curr_Time+pcb->io_time);
+                if (pcb->burst_time2 == 0) {
+                    terminate(pcb, Curr_Time + pcb->io_time);
                     continue;
                 }
                 Start_queue.push(pcb);
                 vector<lld> t;
-                while(!distinct_arrival_time.empty()){
+                while (!distinct_arrival_time.empty()) {
                     t.push_back(distinct_arrival_time.front());
                     distinct_arrival_time.pop();
                 }
                 t.push_back(pcb->arrival_time);
-                sort(t.begin(),t.end());
-                for(int i = 0 ; i < t.size(); i++)
-                {
-                    
+                sort(t.begin(), t.end());
+                for (int i = 0; i < t.size(); i++) {
                     distinct_arrival_time.push(t[i]);
                 }
 
-                
             }
 
             else {
-                
-               if( !distinct_arrival_time.empty() && distinct_arrival_time.front() <= Curr_Time +  pcb->burst_time2)
-                {lld temp_time =  distinct_arrival_time.front();
-                while (!Start_queue.empty()) {
-                PCB *pc = Start_queue.top();
-                if (pc->arrival_time > temp_time) break;
-                Priority_Ready_queue.push(pc);
-                Start_queue.pop();
-                
-                }
-    PCB *pcb1 = Priority_Ready_queue.top();
-            if(pcb != pcb1){
-                pcb->burst_time1 -= pcb1->arrival_time - Curr_Time; 
-                Curr_Time +=  pcb1->arrival_time - Curr_Time;
-                if(pcb->burst_time2 >= 0 ){
-                    Priority_Ready_queue.push(pcb);
-                }
-                
-                continue;
-            }
-            else
-            {Curr_Time = Curr_Time + pcb->burst_time2;
-            pcb->burst_time2 = 0;
-            terminate(pcb, Curr_Time);
-            
-            }
-            distinct_arrival_time.pop();}
-            else
-            {Curr_Time += pcb->burst_time2;
-                pcb->burst_time2 = 0;
-                terminate(pcb, Curr_Time);}
+                if (!distinct_arrival_time.empty() && distinct_arrival_time.front() <= Curr_Time + pcb->burst_time2) {
+                    lld temp_time = distinct_arrival_time.front();
+                    while (!Start_queue.empty()) {
+                        PCB *pc = Start_queue.top();
+                        if (pc->arrival_time > temp_time) break;
+                        Priority_Ready_queue.push(pc);
+                        Start_queue.pop();
+                    }
+                    PCB *pcb1 = Priority_Ready_queue.top();
+                    if (pcb != pcb1) {
+                        pcb->burst_time1 -= pcb1->arrival_time - Curr_Time;
+                        Curr_Time += pcb1->arrival_time - Curr_Time;
+                        if (pcb->burst_time2 >= 0) {
+                            Priority_Ready_queue.push(pcb);
+                        }
 
-               
-                
+                        continue;
+                    } else {
+                        Curr_Time = Curr_Time + pcb->burst_time2;
+                        pcb->burst_time2 = 0;
+                        terminate(pcb, Curr_Time);
+                    }
+                    distinct_arrival_time.pop();
+                } else {
+                    Curr_Time += pcb->burst_time2;
+                    pcb->burst_time2 = 0;
+                    terminate(pcb, Curr_Time);
+                }
             }
-
-            
-        } 
-        // else {
-        //     if (pcb->burst_time1 > 0) {
-        //         if (pcb->arrival_time < Curr_Time) {
-        //             Curr_Time += pcb->burst_time1;
-        //         } else {
-        //             Curr_Time = pcb->arrival_time + pcb->burst_time1;
-        //         }
-        //         pcb->burst_time1 = 0;
-        //         if (pcb->io_time > 0) {
-        //             Device_queue.push(pcb);
-        //             IO_start_time[pcb->pid] = Curr_Time;
-        //         } else {
-        //             Curr_Time += pcb->burst_time2;
-        //             pcb->burst_time2 = 0;
-        //             terminate(pcb, Curr_Time);
-        //         }
-        //     } else {
-        //         if (pcb->arrival_time < Curr_Time) {
-        //             Curr_Time += pcb->burst_time2;
-        //         } else {
-        //             Curr_Time = pcb->arrival_time + pcb->burst_time2;
-        //         }
-        //         pcb->burst_time2 = 0;
-        //         terminate(pcb, Curr_Time);
-        //     }
-        // }
+        }
         PriorityRunning_map.erase(pcb->pid);
         PriorityRunning_map.clear();
         while (!Start_queue.empty()) {
@@ -431,10 +384,6 @@ vector<PCB *> Priority_Sched() {
             Priority_Ready_queue.push(pcb);
             Start_queue.pop();
         }
-        // if (Priority_Ready_queue.empty() && !Device_queue.empty()) {
-        //     Curr_Time = getCurrTime();
-        //     adjust_Device_queue(Curr_Time);
-        // }
     }
 
     adjust_Device_queue(Curr_Time + 10000000);
