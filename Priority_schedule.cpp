@@ -89,7 +89,7 @@ struct CompareProcess_Priority {
     }
 };
 /* Global Queues */
-vector<PCB *> processes;
+vector<PCB *> processes, org_processes;
 unordered_map<int, PCB *> process_map;
 unordered_map<int, PCB *> PriorityRunning_map;
 unordered_map<unsigned int, lld> IO_start_time;
@@ -97,12 +97,16 @@ priority_queue<PCB *, vector<PCB *>, CompareProcess_Priority> Priority_Ready_que
 queue<PCB *> Device_queue;
 queue<PCB *> Start_queue;
 lld Last_io_UpdationTime = 0;
+lld Avg_TAT = 0;
+lld Avg_WT = 0;
+lld Avg_RT = 0;
 /* Utility Functions */
 void terminate(PCB *, lld);
 void adjust_Device_queue(lld Curr_Time);
 vector<PCB *> Priority_Sched();
 void context_switch(PCB *, States);
 bool schedulePriority();
+void getAvg();
 int main() {
     for (int i = 0; i < 500; i++) {
         UUID.push(i);
@@ -120,14 +124,32 @@ int main() {
         cin >> ProcessName;
         cin >> ArrivalTime >> BurstTime1 >> IOTime >> BurstTime2 >> priority;
         PCB *temp = new PCB(ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, priority);
+        PCB *temp1 = new PCB(ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, priority);
+        org_processes.push_back(temp1);
         processes.push_back(temp);
     }
     Priority_Sched();
     for (int i = 0; i < processes.size(); i++) {
-        cout << processes[i]->pid << "\t" << processes[i]->pname << "\t" << processes[i]->ptype << "\t" << processes[i]->priority << "\t" << processes[i]->arrival_time << "\t" << processes[i]->burst_time1 << "\t"
-             << processes[i]->io_time << "\t" << processes[i]->burst_time2 << "\t" << processes[i]->completion_time << "\t" << processes[i]->turnaround_time << "\t"
-             << processes[i]->waiting_time << "\t" << processes[i]->response_time << "\t" << processes[i]->state << "\n";
+        org_processes[i]->completion_time = processes[i]->completion_time;
+        org_processes[i]->response_time = processes[i]->response_time;
+        org_processes[i]->turnaround_time = org_processes[i]->completion_time - org_processes[i]->arrival_time;
+        org_processes[i]->waiting_time = org_processes[i]->turnaround_time - (org_processes[i]->burst_time1 + org_processes[i]->burst_time2 + org_processes[i]->io_time);
     }
+    cout << "pname  priority   arrival_time  burst_time1  io_time  burst_time2  completion_time  response_time  turnaround_time  waiting_time     state  " << endl;
+    for (int i = 0; i < processes.size(); i++) {
+        cout << org_processes[i]->pname << "\t" << org_processes[i]->priority << "\t\t"
+             << org_processes[i]->arrival_time << "\t\t" << org_processes[i]->burst_time1 << "\t"
+             << org_processes[i]->io_time << "\t" << org_processes[i]->burst_time2 << "\t\t"
+             << org_processes[i]->completion_time << "\t\t" << org_processes[i]->response_time
+             << "\t\t" << org_processes[i]->turnaround_time << "\t\t"
+             << org_processes[i]->waiting_time << "\t\t" << org_processes[i]->state << "\n";
+    }
+    getAvg();
+    cout << endl
+         << " Avg Turn Around Time : " << Avg_TAT << endl
+         << " Avg Waiting Time : " << Avg_WT << endl
+         << " Avg Response Time : " << Avg_RT << endl;
+
     return 0;
 }
 
@@ -138,6 +160,19 @@ void context_switch(PCB *currp, States st) {
 void terminate(PCB *currp, lld Curr_Time) {
     currp->completion_time = Curr_Time;
     context_switch(currp, TERMINATED);
+}
+
+void getAvg() {
+    for (int i = 0; i < processes.size(); i++) {
+        Avg_TAT += org_processes[i]->turnaround_time;
+        Avg_WT += org_processes[i]->waiting_time;
+        Avg_RT += org_processes[i]->response_time;
+    }
+    lld n = processes.size();
+    Avg_TAT /= n;
+    Avg_WT /= n;
+    Avg_RT /= n;
+    return;
 }
 void adjust_Device_queue(lld Curr_Time) {
     int len = Device_queue.size();
@@ -227,6 +262,9 @@ vector<PCB *> Priority_Sched() {
         adjust_Device_queue(Curr_Time);
         PCB *pcb = Priority_Ready_queue.top();
         lld prev_Curr_Time = Curr_Time;
+        if (pcb->response_time == INT64_MIN) {
+            pcb->response_time = Curr_Time;
+        }
         bool check = schedulePriority();
         if (!check && !Device_queue.empty()) {
             Curr_Time = getCurrTime();

@@ -37,7 +37,7 @@ struct PCB {
     string pname;
     bool ptype; /* 0->IO, 1->CPU */
     int priority;
-    int RR;
+    lld RR;
     lld arrival_time;
     lld burst_time1;
     lld io_time;
@@ -102,7 +102,7 @@ struct CompareProcessMLQ {
     }
 };
 /* Global Queues */
-vector<PCB *> processes;
+vector<PCB *> processes, org_processes;
 unordered_map<int, PCB *> process_map;
 unordered_map<unsigned int, vector<bool>> Process_Status;  // vector(0)->bt1,vector(0)->IO,vector(0)->bt2
 unordered_map<int, PCB *> MLQRunning_map;
@@ -118,6 +118,9 @@ bool flag = false;
 lld time_slice_foreground = TIME_SLICE_FORE;
 lld time_slice_background = TIME_SLICE_BACK;
 lld time_slice = 2;
+lld Avg_TAT = 0;
+lld Avg_WT = 0;
+lld Avg_RT = 0;
 /* Utility Functions */
 void terminate(PCB *, lld);
 void adjust_Background_Device_queue(lld Curr_Time);
@@ -126,6 +129,7 @@ void context_switch(PCB *, States);
 bool scheduleMLQ();
 lld do_foreground_sched(lld);
 lld do_background_sched(lld);
+void getAvg();
 int main() {
     for (int i = 0; i < 500; i++) {
         UUID.push(i);
@@ -143,14 +147,32 @@ int main() {
         cin >> ProcessName;
         cin >> ArrivalTime >> BurstTime1 >> IOTime >> BurstTime2 >> Priority;
         PCB *temp = new PCB(ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, Priority);
+        PCB *temp1 = new PCB(ProcessName, ArrivalTime, BurstTime1, IOTime, BurstTime2, Priority);
+        org_processes.push_back(temp1);
         processes.push_back(temp);
     }
     MLQ();
     for (int i = 0; i < processes.size(); i++) {
-        cout << processes[i]->pid << "\t" << processes[i]->pname << "\t" << processes[i]->ptype << "\t" << processes[i]->priority << "\t" << processes[i]->arrival_time << "\t" << processes[i]->burst_time1 << "\t"
-             << processes[i]->io_time << "\t" << processes[i]->burst_time2 << "\t" << processes[i]->completion_time << "\t" << processes[i]->turnaround_time << "\t"
-             << processes[i]->waiting_time << "\t" << processes[i]->response_time << "\t" << processes[i]->state << "\n";
+        org_processes[i]->completion_time = processes[i]->completion_time;
+        org_processes[i]->response_time = processes[i]->response_time;
+        org_processes[i]->turnaround_time = org_processes[i]->completion_time - org_processes[i]->arrival_time;
+        org_processes[i]->waiting_time = org_processes[i]->turnaround_time - (org_processes[i]->burst_time1 + org_processes[i]->burst_time2 + org_processes[i]->io_time);
     }
+    cout << "pname  priority   arrival_time  burst_time1  io_time  burst_time2  completion_time  response_time  turnaround_time  waiting_time     state  " << endl;
+    for (int i = 0; i < processes.size(); i++) {
+        cout << org_processes[i]->pname << "\t" << org_processes[i]->priority << "\t\t"
+             << org_processes[i]->arrival_time << "\t\t" << org_processes[i]->burst_time1 << "\t"
+             << org_processes[i]->io_time << "\t" << org_processes[i]->burst_time2 << "\t\t"
+             << org_processes[i]->completion_time << "\t\t" << org_processes[i]->response_time
+             << "\t\t" << org_processes[i]->turnaround_time << "\t\t"
+             << org_processes[i]->waiting_time << "\t\t" << org_processes[i]->state << "\n";
+    }
+    getAvg();
+    cout << endl
+         << " Avg Turn Around Time : " << Avg_TAT << endl
+         << " Avg Waiting Time : " << Avg_WT << endl
+         << " Avg Response Time : " << Avg_RT << endl;
+
     return 0;
 }
 
@@ -163,6 +185,18 @@ void terminate(PCB *currp, lld Curr_Time) {
     context_switch(currp, TERMINATED);
 }
 
+void getAvg() {
+    for (int i = 0; i < processes.size(); i++) {
+        Avg_TAT += org_processes[i]->turnaround_time;
+        Avg_WT += org_processes[i]->waiting_time;
+        Avg_RT += org_processes[i]->response_time;
+    }
+    lld n = processes.size();
+    Avg_TAT /= n;
+    Avg_WT /= n;
+    Avg_RT /= n;
+    return;
+}
 void adjust_foreground_Device_queue(lld Curr_Time) {
     int len = foreground_Device_queue.size();
     int i = 0;
@@ -365,6 +399,9 @@ lld do_foreground_sched(lld Curr_Time) {
         // cout << "Curr_Time : " << Curr_Time << " Pid :- " << pcb->pid << " Burst Time1- " << pcb->burst_time1 << " IO- " << pcb->io_time
         //      << "  Burst Time2- " << pcb->burst_time2 << endl;
         lld prev_Curr_Time = Curr_Time;
+        if (pcb->response_time == INT64_MIN) {
+            pcb->response_time = Curr_Time;
+        }
         bool check = scheduleRR();
         if (!check && !foreground_Device_queue.empty()) {
             Curr_Time = getCurrTime_foreground();
@@ -398,7 +435,6 @@ lld do_foreground_sched(lld Curr_Time) {
 
             } else {
                 if (pcb->burst_time1 <= time_slice) {
-
                     if (!MLQ_Background_Ready_queue.empty()) {
                         MLQ_foreground_Ready_queue.push(pcb);
                         MLQRunning_map.erase(pcb->pid);
@@ -451,7 +487,6 @@ lld do_foreground_sched(lld Curr_Time) {
 
             } else {
                 if (pcb->burst_time2 <= time_slice) {
-
                     if (!MLQ_Background_Ready_queue.empty()) {
                         MLQ_foreground_Ready_queue.push(pcb);
                         MLQRunning_map.erase(pcb->pid);
@@ -502,6 +537,9 @@ lld do_background_sched(lld Curr_Time) {
         adjust_Background_Device_queue(Curr_Time);
         PCB *pcb = MLQ_Background_Ready_queue.top();
         lld prev_Curr_Time = Curr_Time;
+        if (pcb->response_time == INT64_MIN) {
+            pcb->response_time = Curr_Time;
+        }
         bool check = scheduleFcfs();
         if (!check && !Background_Device_queue.empty()) {
             Curr_Time = getCurrTime_background();

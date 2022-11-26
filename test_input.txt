@@ -4,12 +4,17 @@ Ca 2 2 4 2 2
 Iv 4 4 1 4 1
 Cb 5 3 5 1 2
 
- #RR_queue---------
+ #RR_queue, fcfs, sjf ---------
 Ia 0 5 2 6
 Ca 2 2 4 2
 Iv 4 4 1 4
 Cb 5 3 5 1
-
+ 
+ #Priority------------
+Ia 0 5 2 6 2
+Ca 2 2 4 2 3
+Iv 4 4 1 4 1
+Cb 5 3 5 1 7
 #git commands-----
 git status
 git add -A
